@@ -1,0 +1,7 @@
+.DS_Store
+.vercel
+*.log
+*.blend
+__pycache__/
+index.backup_before_badges.html
+index.v1_backup.html

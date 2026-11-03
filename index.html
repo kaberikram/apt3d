@@ -1,0 +1,255 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apartment 3D — Bauhaus × Mid-Century</title>
+<style>body{margin:0;overflow:hidden;font-family:Futura,'Helvetica Neue',Arial,sans-serif;background:#efe6da}
+#ui{position:fixed;top:10px;left:10px;right:10px;display:flex;flex-wrap:wrap;gap:6px;z-index:2}
+#ui button{border:0;padding:8px 12px;border-radius:18px;background:#fffaf2;color:#222;font-weight:600;box-shadow:0 1px 4px #0003;cursor:pointer}
+#ui button.k{background:#c8412f;color:#fff}#ui button.b{background:#23439a;color:#fff}#ui button.y{background:#e0a92b}
+#t{position:fixed;bottom:10px;left:10px;font-size:12px;color:#5a4a3a;z-index:2}#info{position:fixed;right:10px;bottom:40px;width:290px;background:#fffaf2;border-radius:14px;padding:12px 14px;box-shadow:0 2px 10px #0004;z-index:3;display:none;font-size:14px}
+#info a,#list a{color:#23439a;font-weight:700}#info .p{color:#c8412f;font-size:18px;font-weight:800}
+#list{position:fixed;right:10px;top:56px;bottom:40px;width:340px;overflow:auto;background:#fffaf2;border-radius:14px;padding:10px 14px;box-shadow:0 2px 10px #0004;z-index:3;display:none;font-size:13px}
+#list h4{margin:10px 0 4px;color:#23439a}#list div{padding:3px 0;border-bottom:1px solid #eee;cursor:pointer}#list .tot{font-weight:800;font-size:15px;color:#c8412f}
+.tag{font-size:10px;padding:1px 5px;border-radius:6px;background:#a9b99a;color:#fff;margin-left:4px}.tag.px{background:#e0a92b}</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script></head><body>
+<div id="ui"></div><div id="info"></div><div id="list"></div><div id="t">Drag to orbit · pinch/scroll to zoom · tap furniture for IKEA product · approx. scale from floor plan (10.35 × 10.05 m)</div>
+<script type="module">
+import * as THREE from 'three';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+const R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.toneMapping=THREE.ACESFilmicToneMapping;R.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0xefe6da);
+const C=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.05,200);const O=new OrbitControls(C,R.domElement);O.enableDamping=true;O.maxPolarAngle=Math.PI/2.05;
+S.add(new THREE.HemisphereLight(0xfff6e8,0x8a7560,1.1));const sun=new THREE.DirectionalLight(0xfff0d8,2.2);sun.position.set(14,18,6);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10});sun.shadow.bias=-.0005;sun.target.position.set(5,0,5);S.add(sun,sun.target);
+const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:o.r??.7,metalness:o.m??0,...(o.e?{emissive:o.e,emissiveIntensity:o.ei??1}:{}),transparent:!!o.t,opacity:o.t??1});
+const mat={wall:M(0xf6f1e7,{r:.9}),walnut:M(0x6b4226,{r:.55}),teak:M(0xa0683a,{r:.55}),oak:M(0xcfa978,{r:.8}),terr:M(0xe9e3d8,{r:.6}),chrome:M(0xdddddd,{r:.15,m:1}),
+red:M(0xc8412f),blue:M(0x23439a),mus:M(0xe0a92b),cream:M(0xfaf5ea),black:M(0x222222,{r:.4}),leather:M(0x3a2418,{r:.45}),blush:M(0xefc4bc),sage:M(0xa9b99a),
+screen:M(0x111a2e,{e:0x3a6ad0,ei:.35,r:.3}),glass:M(0xbfe3ff,{t:.25,r:.05}),lamp:M(0xfff3d6,{e:0xffe2a8,ei:1.2}),tile:M(0xd9dde0,{r:.4}),white:M(0xffffff,{r:.4}),grey:M(0x8c8c88),green:M(0x5f7d4d)};
+const box=(w,h,d,x,y,z,m,p=S)=>{const g=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);g.position.set(x,y,z);g.castShadow=g.receiveShadow=true;p.add(g);return g};
+const cyl=(r1,r2,h,x,y,z,m,seg=24)=>{const g=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg),m);g.position.set(x,y,z);g.castShadow=g.receiveShadow=true;S.add(g);return g};
+const sph=(r,x,y,z,m)=>{const g=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);g.position.set(x,y,z);g.castShadow=true;S.add(g);return g};
+const tube=(pts,r=.015)=>{const c=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(...p)),false,'catmullrom',.01);const g=new THREE.Mesh(new THREE.TubeGeometry(c,40,r,8),mat.chrome);g.castShadow=true;S.add(g);return g};
+// ---------- floors (x right, z down; metres) ----------
+const floor=(x1,z1,x2,z2,m)=>box(x2-x1,.02,z2-z1,(x1+x2)/2,-.01,(z1+z2)/2,m);
+floor(0,1.2,3.2,4.65,mat.oak);floor(3.5,.35,6.6,3.5,mat.oak);floor(1.75,4.75,4.85,7.55,mat.oak);
+floor(3.2,3.5,6.9,4.75,mat.terr);floor(6.6,1.2,10.35,8.8,mat.terr);floor(8.7,8.8,10.35,10.05,mat.terr);floor(5.9,7.6,8.7,10.05,mat.terr);
+floor(0,4.75,1.75,7.6,mat.tile);floor(4.85,4.75,6.6,7.6,mat.tile);floor(4.6,7.6,5.9,10.05,mat.tile);floor(0,0,3.3,1.2,mat.grey);floor(6.6,0,10.35,1.2,mat.grey);
+// ---------- walls with openings ----------
+const H=2.5,T=.12;
+function wall(x1,z1,x2,z2,gaps=[]){const hor=z1===z2,L=hor?x2-x1:z2-z1;let segs=[[0,L,0,H]];
+ for(const [a,b,y0=0,y1=2.1] of gaps){const n=[];for(const s of segs){if(b<=s[0]||a>=s[1]||s[2]!==0||s[3]!==H){n.push(s);continue}
+  if(a>s[0])n.push([s[0],a,0,H]);if(b<s[1])n.push([b,s[1],0,H]);if(y0>0)n.push([a,b,0,y0,1]);if(y1<H)n.push([a,b,y1,H,1]);
+  if(y0>0)wins.push([hor,x1,z1,a,b,y0,y1])}segs=n}
+ for(const [a,b,y0,y1] of segs){const l=b-a,h=y1-y0,c=(a+b)/2;hor?box(l,h,T,x1+c,y0+h/2,z1,mat.wall):box(T,h,l,x1,y0+h/2,z1+c,mat.wall)}}
+const wins=[];
+// exterior
+wall(0,1.2,0,7.6,[[1.2,2.4,.9,2.2]]);wall(0,7.6,4.6,7.6,[[.4,1.2,1.2,2.2],[2.4,3.6,.9,2.2],[4.4,4.6]]);
+wall(4.6,7.6,4.6,10.05);wall(4.6,10.05,8.7,10.05,[[1.6,3.4,1.0,2.2]]);wall(8.7,10.05,10.35,10.05);wall(10.35,1.2,10.35,10.05,[[8.0,8.8,.9,2.2],[1,6,.4,2.3]]);
+wall(0,1.2,3.3,1.2,[[.3,2.9,.5,2.3]]);wall(3.3,0,3.3,1.2);wall(3.5,.35,6.6,.35,[[.5,2.6,.6,2.3]]);wall(3.5,.35,3.5,3.5);wall(6.6,.35,6.6,1.2);
+wall(6.6,1.2,10.35,1.2,[[.2,3.6,.05,2.4]]);
+// interior
+wall(3.2,1.2,3.2,4.65,[]);wall(0,4.65,3.2,4.65,[]);wall(3.5,3.5,6.6,3.5,[]);wall(6.6,1.2,6.6,3.5,[[1.6,2.4]]);
+wall(3.2,3.55,3.5,3.55);wall(3.2,3.7,3.2,4.65,[[.1,.85]]);
+wall(0,4.75,1.75,4.75,[[.8,1.55]]);wall(1.75,4.75,1.75,7.6);wall(1.75,4.75,4.85,4.75,[[2.2,2.95]]);wall(4.85,4.75,4.85,7.6);
+wall(4.85,4.75,6.6,4.75,[[.1,.8]]);wall(6.6,4.75,6.6,7.6);wall(4.6,7.6,8.7,7.6,[[.3,1.0],[1.3,4.1]]);wall(5.9,7.6,5.9,10.05,[[.6,1.3]]);
+wall(8.7,8.8,8.7,10.05);wall(3.5,1.2,3.5,0);
+// glass in windows
+for(const [hor,x,z,a,b,y0,y1] of wins){const l=b-a,h=y1-y0,c=(a+b)/2;const g=hor?box(l,h,.03,x+c,y0+h/2,z,mat.glass):box(.03,h,l,x,y0+h/2,z+c,mat.glass);g.castShadow=false}
+// AC ledge units
+box(.8,.6,.3,1,.3,.4,mat.white);box(.8,.6,.3,8,.3,.4,mat.white);box(.8,.6,.3,9.2,.3,.4,mat.white);
+// ---------- furniture helpers ----------
+const rug=(w,d,x,z,cols)=>{const n=cols.length;for(let i=0;i<n;i++)box(w*(1-i/n),.012,d*(1-i/n),x,.006+i*.002,z,cols[i])};
+const bed=(x,z,w,l,rot,quilt,head=mat.walnut)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;S.add(g);
+ box(w+.1,.3,l,0,.15,0,head,g);box(w,.22,l-.1,0,.41,.02,mat.cream,g);box(w,.06,l*.6,0,.55,l*.18,quilt,g);box(w+.1,.9,.06,0,.45,-l/2,head,g);
+ box(w*.4,.12,.35,-w*.24,.58,-l/2+.3,mat.white,g);box(w*.4,.12,.35,w*.24,.58,-l/2+.3,mat.white,g);return g};
+const nightstand=(x,z)=>{box(.45,.45,.4,x,.3,z,mat.teak);for(const [a,b] of [[-.18,-.15],[.18,-.15],[-.18,.15],[.18,.15]])cyl(.015,.015,.1,x+a,.04,z+b,mat.black);
+ cyl(.02,.02,.3,x,.67,z,mat.chrome);sph(.13,x,.9,z,mat.lamp)};
+const wardrobe=(x1,z,x2,dep,face=1,col=mat.walnut)=>{const L=x2-x1,n=Math.round(L/.5);box(L,2.3,dep,(x1+x2)/2,1.15,z,col);
+ for(let i=0;i<n;i++){const cx=x1+L*(i+.5)/n;box(L/n-.02,2.2,.02,cx,1.15,z+face*dep/2,i%3==1?mat.oak:col);box(.02,.4,.03,cx+(i%2?-.18:.18)*L/n*2,1.1,z+face*(dep/2+.02),mat.chrome)}};
+const wardrobeZ=(x,z1,z2,dep,face=1)=>{const L=z2-z1,n=Math.round(L/.5);box(dep,2.3,L,x,1.15,(z1+z2)/2,mat.walnut);
+ for(let i=0;i<n;i++){const cz=z1+L*(i+.5)/n;box(.02,2.2,L/n-.02,x+face*dep/2,1.15,cz,i%3==1?mat.oak:mat.walnut);box(.03,.4,.02,x+face*(dep/2+.02),1.1,cz+(i%2?-.15:.15),mat.chrome)}};
+const wassily=(x,z,rot,seat=mat.leather)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;S.add(g);
+ const t=(a)=>{const c=new THREE.CatmullRomCurve3(a.map(p=>new THREE.Vector3(...p)),false,'catmullrom',.01);const m=new THREE.Mesh(new THREE.TubeGeometry(c,30,.014,8),mat.chrome);m.castShadow=true;g.add(m)};
+ for(const s of[-.33,.33]){t([[s,0,.35],[s,0,-.3],[s,.75,-.35],[s,.6,.3]]);t([[s,.4,.35],[s,.4,-.3]])}t([[-.33,0,.35],[.33,0,.35]]);
+ box(.6,.02,.55,0,.38,0,seat,g).rotation.x=-.1;box(.6,.4,.02,0,.6,-.3,seat,g).rotation.x=-.15;box(.02,.15,.5,-.33,.55,0,seat,g);box(.02,.15,.5,.33,.55,0,seat,g);return g};
+const eames=(x,z,rot,shell=mat.cream)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;S.add(g);
+ const s=new THREE.Mesh(new THREE.SphereGeometry(.28,20,12,0,Math.PI*2,Math.PI*.55,Math.PI*.45),shell);s.scale.set(1,.5,1);s.position.y=.68;s.rotation.x=Math.PI;s.castShadow=true;g.add(s);
+ const b=box(.42,.35,.04,0,.75,-.2,shell,g);b.rotation.x=-.15;for(const [a,c] of[[-.18,-.18],[.18,-.18],[-.18,.18],[.18,.18]]){const l=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.45),mat.teak);l.position.set(a,.22,c);l.rotation.set(c*.4,0,-a*.4);g.add(l)}return g};
+const arcLamp=(x,z,tx,tz)=>{cyl(.18,.18,.05,x,.03,z,mat.black);tube([[x,0,z],[x,1.6,z],[(x+tx)/2,2.1,(z+tz)/2],[tx,1.9,tz]],.018);sph(.2,tx,1.75,tz,mat.lamp)};
+const plant=(x,z,s=1)=>{cyl(.15*s,.12*s,.35*s,x,.18*s,z,mat.red);sph(.3*s,x,.6*s,z,mat.green);sph(.22*s,x+.1,.85*s,z-.05,mat.green)};
+const art=(x,y,z,rot,w=.8,h=.6,cols=[mat.red,mat.mus,mat.blue])=>{const g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=rot;S.add(g);box(w,h,.03,0,0,0,mat.cream,g);
+ const c=new THREE.Mesh(new THREE.CircleGeometry(h*.28,24),cols[0]);c.position.set(-w*.18,h*.08,.02);g.add(c);box(w*.35,h*.18,.01,w*.18,-h*.22,.02,cols[1],g);box(w*.1,h*.7,.01,w*.3,h*.05,.02,cols[2],g)};
+const textMesh=(txt,x,y,z,rot,col='#c8412f',w=1.6,h=.4)=>{const cv=document.createElement('canvas');cv.width=1024;cv.height=256;const c=cv.getContext('2d');
+ c.font='bold 170px Futura, Helvetica, Arial';c.fillStyle=col;c.textAlign='center';c.textBaseline='middle';c.fillText(txt,512,135);
+ const tx=new THREE.CanvasTexture(cv);tx.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tx,transparent:true}));m.position.set(x,y,z);m.rotation.y=rot;S.add(m);return m};
+// ---------- IKEA FURNITURE (real IKEA MY 3D models where available) ----------
+const PROD={"79406530": {"no": "79406530", "name": "IDANÄS", "type": "Bed frame with storage", "desc": "IDANÄS dark brown bed with drawers and wooden headboard.", "dims": "180x200 cm", "price": 2249.0, "url": "https://www.ikea.com/my/en/p/idanaes-bed-frame-with-storage-dark-brown-loenset-s79406530/", "model": "models/79406530.glb", "meas": {}}, "60458816": {"no": "60458816", "name": "IDANÄS", "type": "Bedside table", "desc": "Dark brown IDANÄS bedside table with shelf and drawer, sleek modern design.", "dims": "47x40 cm", "price": 549.0, "url": "https://www.ikea.com/my/en/p/idanaes-bedside-table-dark-brown-stained-60458816/", "model": "models/60458816.glb", "meas": {"height": 680, "depth": 400, "width": 470, "depth of drawer": 300, "free height": 170, "width drawer": 360, "height of drawer": 200}}, "79432973": {"no": "79432973", "name": "PAX / GRIMO", "type": "Wardrobe combination", "desc": "White PAX wardrobe with sliding doors, featuring internal shelves and mesh baskets for storage. Sleek, modern design.", "dims": "200x66x236 cm", "price": 2395.0, "url": "https://www.ikea.com/my/en/p/pax-grimo-wardrobe-combination-white-white-s79432973/", "model": "models/79432973.glb", "meas": {"height": 2364, "depth": 660, "width": 2000}}, "30359827": {"no": "30359827", "name": "STRANDMON", "type": "Wing chair", "desc": "Grey fabric wingback chair, high back, wooden legs, tufted detail.", "dims": "", "price": 599.0, "url": "https://www.ikea.com/my/en/p/strandmon-wing-chair-nordvalla-dark-grey-30359827/", "model": "models/30359827.glb", "meas": {"seat depth": 540, "seat width": 490, "seat height": 450, "height": 1010, "depth": 960, "width": 820}}, "60216549": {"no": "60216549", "name": "HEKTAR", "type": "Floor lamp", "desc": "A black HEKTAR floor lamp with a large, adjustable metal shade, standing on a round base.", "dims": "", "price": 259.0, "url": "https://www.ikea.com/my/en/p/hektar-floor-lamp-dark-grey-60216549/", "model": "models/60216549.glb", "meas": {"cord length": 1870, "shade diameter": 315, "base diameter": 340, "height": 1810, "max.": 53000}}, "90166449": {"no": "90166449", "name": "STOCKHOLM", "type": "Rug, flatwoven", "desc": "STOCKHOLM black/white striped rug, rectangular, hand-woven wool.", "dims": "170x240 cm", "price": 1299.0, "url": "https://www.ikea.com/my/en/p/stockholm-rug-flatwoven-handmade-striped-black-off-white-90166449/", "model": "models/90166449.glb", "meas": {"length": 2400, "area": 40800, "thickness": 6, "width": 1700}}, "89478022": {"no": "89478022", "name": "PAX / FORSAND", "type": "Wardrobe", "desc": "An all-white ikea PAX wardrobe with open doors, displaying multiple shelves and mesh baskets.", "dims": "250x60x236 cm", "price": 2800.0, "url": "https://www.ikea.com/my/en/p/pax-forsand-wardrobe-white-white-s89478022/", "model": "models/89478022.glb", "meas": {"height": 2364, "depth": 600, "width": 2500, "plinth height": 2360}}, "69528141": {"no": "69528141", "name": "MITTZON", "type": "Desk", "desc": "MITTZON adjustable desk in walnut and black. Rectangular top with black metal legs. Height-adjustable, suitable for standing/sitting.", "dims": "140x80 cm", "price": 899.0, "url": "https://www.ikea.com/my/en/p/mittzon-desk-walnut-veneer-black-s69528141/", "model": "models/69528141.glb", "meas": {"max. load": 50000000, "min. height": 650, "depth": 800, "width": 1400, "max. height": 850}}, "50261151": {"no": "50261151", "name": "MARKUS", "type": "Office chair", "desc": "Black ergonomic office chair with mesh back and armrests, five wheels, and adjustable.", "dims": "Medium", "price": 599.0, "url": "https://www.ikea.com/my/en/p/markus-office-chair-vissle-dark-grey-50261151/", "model": "models/50261151.glb", "meas": {"seat depth": 470, "seat width": 530, "max seat height": 570, "min. height": 1290, "depth": 600, "width": 620, "max. height": 1400, "min seat height": 460, "tested for": 110000000}}, "10604151": {"no": "10604151", "name": "KALLAX", "type": "Shelving unit", "desc": "KALLAX Shelving unit, brown-red, 147x39x77 cm", "dims": "147x39x77 cm", "price": 399.0, "url": "https://www.ikea.com/my/en/p/kallax-shelving-unit-brown-red-10604151/", "model": "models/10604151.glb", "meas": {"max. load/shelf": 10000000, "frame, depth": 390, "frame width": 1465, "frame height": 765}}, "40574586": {"no": "40574586", "name": "EKET", "type": "Cabinet w 2 doors and 1 shelf", "desc": "An EKET cabinet in brown wood. It is rectangular, featuring two doors with a sleek, minimalist design.", "dims": "70x35x70 cm", "price": 350.0, "url": "https://www.ikea.com/my/en/p/eket-cabinet-w-2-doors-and-1-shelf-brown-walnut-effect-40574586/", "model": "models/40574586.glb", "meas": {"max. load/shelf": 10000000, "height": 700, "depth": 350, "width": 700}}, "40518411": {"no": "40518411", "name": "TVÄRHAND", "type": "Table lamp", "desc": "Black metal and bamboo table lamp with a rounded top and a single exposed bulb.", "dims": "", "price": 55.0, "url": "https://www.ikea.com/my/en/p/tvaerhand-table-lamp-black-bamboo-40518411/", "model": "models/40518411.glb", "meas": {"height": 470, "base width": 120, "base height": 20, "base length": 180, "max.": 16000}}, "19240788": {"no": "19240788", "name": "POÄNG", "type": "Armchair", "desc": "POÄNG armchair: light wood, grey fabric, curved back & arms.", "dims": "", "price": 299.0, "url": "https://www.ikea.com/my/en/p/poaeng-armchair-birch-veneer-knisa-light-beige-s19240788/", "model": "models/19240788.glb", "meas": {"seat depth": 530, "seat width": 550, "seat height": 400, "height": 1000, "depth": 830, "width": 680}}, "20372155": {"no": "20372155", "name": "SUNDVIK", "type": "Cot", "desc": "A white SUNDVIK baby cot with vertical bars and a removable side, suitable for an infants comfortable and safe sleep.", "dims": "60x120 cm", "price": 799.0, "url": "https://www.ikea.com/my/en/p/sundvik-cot-white-20372155/", "model": "models/20372155.glb", "meas": {"length": 1250, "max. load": 20000000, "bed length": 1200, "bed width": 600, "height": 860, "width": 670, "free height under cot": 180}}, "70591301": {"no": "70591301", "name": "SUNDVIK", "type": "Changing table/chest of drawers", "desc": "A white wooden SUNDVIK changing table with drawers. It a top shelf and a foldable changing board.", "dims": "", "price": 999.0, "url": "https://www.ikea.com/my/en/p/sundvik-changing-table-chest-of-drawers-white-70591301/", "model": "models/70591301.glb", "meas": {"max. load": 13600000, "min. height": 990, "min. depth": 540, "width": 780, "max. depth": 790, "max. height": 1080, "depth of drawer": 460, "free height": 180}}, "59627132": {"no": "59627132", "name": "POÄNG", "type": "Rocking-chair", "desc": "POÄNG Rocking-chair, walnut effect/Kelinge beige", "dims": "", "price": 499.0, "url": "https://www.ikea.com/my/en/p/poaeng-rocking-chair-walnut-effect-kelinge-beige-s59627132/", "model": null, "meas": null}, "80573655": {"no": "80573655", "name": "GULDVÄVARE", "type": "Mobile", "desc": "GULDVÄVARE mobile colourful crocheted characters on wooden rods for baby stimulation.", "dims": "", "price": 49.0, "url": "https://www.ikea.com/my/en/p/guldvaevare-mobile-multicolour-80573655/", "model": null, "meas": null}, "70623076": {"no": "70623076", "name": "JÄRNVÄG", "type": "Rug, low pile", "desc": "A red, beige, and blue JÄRNVÄG area rug with intricate patterns. Its rectangular and made from recycled materials.", "dims": "160x230 cm", "price": 399.0, "url": "https://www.ikea.com/my/en/p/jaernvaeg-rug-low-pile-ornament-pattern-pink-beige-70623076/", "model": "models/70623076.glb", "meas": {"length": 2300, "area": 36800, "width": 1600, "surface density": 2200, "pile length": 10}}, "20368832": {"no": "20368832", "name": "SUNDVIK", "type": "Wardrobe", "desc": "A white SUNDVIK wardrobe with one drawer and two doors, designed in a classic style with durable materials.", "dims": "80x50x172 cm", "price": 999.0, "url": "https://www.ikea.com/my/en/p/sundvik-wardrobe-white-20368832/", "model": "models/20368832.glb", "meas": {"height": 1720, "depth": 500, "width": 800, "depth of drawer": 427, "free height": 180}}, "10381853": {"no": "10381853", "name": "LUSTIGT", "type": "Wall shelf", "desc": "LUSTIGT wall shelf, birch plywood, adjustable shelves, 3 small ladders, modern design.", "dims": "37x37 cm", "price": 29.0, "url": "https://www.ikea.com/my/en/p/lustigt-wall-shelf-10381853/", "model": "models/10381853.glb", "meas": {"max. load/shelf": 400000, "height": 370, "depth": 60, "width": 370, "max. load/comp": 2000000, "total width": 630}}, "40506234": {"no": "40506234", "name": "ÄPPLARYD", "type": "3-seat sofa", "desc": "Modern grey fabric sofa with slight texture, black metal legs, simple, clean design, comfy cushions.", "dims": "", "price": 3495.0, "url": "https://www.ikea.com/my/en/p/aepplaryd-3-seat-sofa-lejde-grey-black-40506234/", "model": "models/40506234.glb", "meas": {"seat depth": 610, "seat height": 470, "depth": 930, "width": 2310, "armrest height": 720, "free height": 200, "height backrest": 700, "height incl back cshns": 820, "armrest width": 170}}, "99612181": {"no": "99612181", "name": "BESTÅ", "type": "TV bench with doors", "desc": "BESTÅ TV bench with doors, white Lappviken/brown walnut effect, 180x42x38 cm", "dims": "180x42x38 cm", "price": 595.0, "url": "https://www.ikea.com/my/en/p/besta-tv-bench-with-doors-white-lappviken-brown-walnut-effect-s99612181/", "model": "models/99612181.glb", "meas": {"max. load/shelf": 20000000, "height": 380, "depth": 420, "width": 1800, "max. tv weight": 30000000}}, "90353078": {"no": "90353078", "name": "STOCKHOLM", "type": "Coffee table", "desc": "Ikea STOCKHOLM walnut veneer oval coffee table with shelf.", "dims": "180x59 cm", "price": 1499.0, "url": "https://www.ikea.com/my/en/p/stockholm-coffee-table-walnut-veneer-90353078/", "model": "models/90353078.glb", "meas": {"length": 1800, "height": 400, "width": 590}}, "40585924": {"no": "40585924", "name": "STOCKHOLM 2025", "type": "Floor lamp", "desc": "The STOCKHOLM 2025 floor lamp with a brass-like base, natural stone base, and a cylindrical white shade.", "dims": "159 cm", "price": 399.0, "url": "https://www.ikea.com/my/en/p/stockholm-2025-floor-lamp-white-textile-brass-plated-40585924/", "model": "models/40585924.glb", "meas": {"cord length": 2000, "shade diameter": 500, "total height": 1590, "max. power/bulb": 16000}}, "20593816": {"no": "20593816", "name": "STOCKHOLM 2025", "type": "Rug, flatwoven", "desc": "STOCKHOLM 2025 rug, geometric brown/white/black pattern, handwoven wool and cotton, rectangular, reversible.", "dims": "170x240 cm", "price": 1199.0, "url": "https://www.ikea.com/my/en/p/stockholm-2025-rug-flatwoven-white-brown-light-blue-handwoven-20593816/", "model": "models/20593816.glb", "meas": {"length": 2400, "area": 40800, "width": 1700}}, "00411997": {"no": "00411997", "name": "GLADOM", "type": "Tray table", "desc": "A small, round GLADOM side table in black. It a removable tray top for convenience and is supported by a sturdy metal frame.", "dims": "45x53 cm", "price": 59.0, "url": "https://www.ikea.com/my/en/p/gladom-tray-table-black-00411997/", "model": "models/00411997.glb", "meas": {"max. load": 10000000, "height": 525, "diameter": 445}}, "70400896": {"no": "70400896", "name": "STRANDTORP", "type": "Extendable table", "desc": "Brown rectangular STRANDTORP dining table with black legs, modern design.", "dims": "150/205/260x95 cm", "price": 1999.0, "url": "https://www.ikea.com/my/en/p/strandtorp-extendable-table-brown-70400896/", "model": "models/70400896.glb", "meas": {"length": 2050, "min. length": 1500, "max. length": 2600, "height": 750, "width": 950}}, "80457236": {"no": "80457236", "name": "LISABO", "type": "Chair", "desc": "LISABO chair, light wood, natural finish, sleek design, four legs, backrest, simple, modern.", "dims": "", "price": 225.0, "url": "https://www.ikea.com/my/en/p/lisabo-chair-ash-80457236/", "model": "models/80457236.glb", "meas": {"seat depth": 390, "seat width": 440, "seat height": 450, "height": 800, "depth": 510, "width": 460, "tested for": 110000000}}, "50586305": {"no": "50586305", "name": "STOCKHOLM 2025", "type": "Pendant lamp", "desc": "A STOCKHOLM 2025 gold pendant lamp with clear glass cylinders. Elegant design for dining or living room, providing direct light.", "dims": "38 cm", "price": 399.0, "url": "https://www.ikea.com/my/en/p/stockholm-2025-pendant-lamp-glass-brass-plated-50586305/", "model": "models/50586305.glb", "meas": {"cord length": 1600, "shade diameter": 380, "min. height": 800, "length of chain": 1300, "max.": 16000}}, "70506751": {"no": "70506751", "name": "KLACKENÄS", "type": "Sideboard", "desc": "KLACKENÄS sideboard: oak-wood & black, rectangular, 4 doors with handles.", "dims": "120x97 cm", "price": 1290.0, "url": "https://www.ikea.com/my/en/p/klackenaes-sideboard-black-oak-veneer-brown-stained-70506751/", "model": "models/70506751.glb", "meas": {"height": 970, "depth": 410, "width": 1200, "width drawer": 510, "depth of drawer": 320}}};
+const PLACE=[["79406530", "Master", 1.05, 2.9, Math.PI/2, 0], ["60458816", "Master", 0.26, 1.72, Math.PI/2, 0], ["60458816", "Master", 0.26, 4.08, Math.PI/2, 0], ["79432973", "Master", 2.86, 2.25, -Math.PI/2, 0], ["30359827", "Master", 2.45, 4.1, Math.PI*1.2, 0], ["60216549", "Master", 2.95, 4.42, 0, 0], ["90166449", "Master", 1.35, 2.9, Math.PI/2, 0], ["89478022", "Office", 3.81, 1.9, Math.PI/2, 0], ["69528141", "Office", 5.3, 0.76, 0, 0], ["50261151", "Office", 5.3, 1.5, Math.PI, 0], ["40518411", "Office", 5.85, 0.6, 0, 0.75], ["10604151", "Office", 6.4, 1.85, -Math.PI/2, 0], ["40574586", "Office", 6.42, 1.85, -Math.PI/2, 0.77], ["19240788", "Office", 5.4, 2.85, Math.PI*1.25, 0], ["20372155", "Seroja", 2.6, 7.18, Math.PI, 0], ["70591301", "Seroja", 4.35, 7.22, Math.PI, 0], ["20368832", "Seroja", 2.01, 5.35, Math.PI/2, 0], ["70623076", "Seroja", 3.3, 6.15, Math.PI/2, 0], ["10381853", "Seroja", 4.82, 5.7, -Math.PI/2, 1.3], ["10381853", "Seroja", 4.82, 6.4, -Math.PI/2, 1.55], ["40506234", "Living", 9.88, 2.9, -Math.PI/2, 0], ["90353078", "Living", 8.75, 2.9, Math.PI/2, 0], ["99612181", "Living", 7.27, 2.9, Math.PI/2, 0], ["20593816", "Living", 8.7, 2.9, Math.PI/2, 0], ["40585924", "Living", 10.05, 4.3, 0, 0], ["00411997", "Living", 10.05, 1.5, 0, 0], ["70400896", "Dining", 8.3, 6.0, Math.PI/2, 0], ["80457236", "Dining", 7.62, 5.4, Math.PI/2, 0], ["80457236", "Dining", 7.62, 6.0, Math.PI/2, 0], ["80457236", "Dining", 7.62, 6.6, Math.PI/2, 0], ["80457236", "Dining", 8.98, 5.4, -Math.PI/2, 0], ["80457236", "Dining", 8.98, 6.0, -Math.PI/2, 0], ["80457236", "Dining", 8.98, 6.6, -Math.PI/2, 0], ["50586305", "Dining", 8.3, 5.6, 0, -2.0], ["50586305", "Dining", 8.3, 6.4, 0, -2.0], ["70506751", "Dining", 10.12, 6.0, -Math.PI/2, 0]];
+
+const loader=new GLTFLoader();const draco=new DRACOLoader();draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');loader.setDRACOLoader(draco);const pickables=[];let pending=0;
+function tag(o,no){o.traverse(m=>{m.userData.prod=no;if(m.isMesh){m.castShadow=m.receiveShadow=true;pickables.push(m)}})}
+// ================= EDITABLE FURNITURE STATE =================
+const ROLE2CAT={"79406530":"bed","60458816":"bedside","79432973":"wardrobe","30359827":"armchair","60216549":"lamp","90166449":"rug","89478022":"wardrobe","69528141":"desk","50261151":"officechair","10604151":"shelving","40574586":"sideboard","40518411":"lamp","19240788":"armchair","20372155":"nursery","70591301":"nursery","59627132":"armchair","80573655":"nursery","70623076":"rug","20368832":"nursery","10381853":"shelving","40506234":"sofa","99612181":"tvbench","90353078":"coffeetable","40585924":"lamp","20593816":"rug","00411997":"coffeetable","70400896":"diningtable","80457236":"diningchair","50586305":"lamp","70506751":"sideboard"};
+let LIB={};for(const no in PROD)LIB[no]={...PROD[no],cat:ROLE2CAT[no]||'sideboard',thumb:null};
+const getP=no=>LIB[no]||PROD[no];
+const DEFAULT=PLACE.map(([no,room,x,z,ry,y])=>({no,room,x,z,ry,y})).concat([{no:"59627132",room:"Seroja",proxy:1},{no:"80573655",room:"Seroja",proxy:1}]);
+let ITEMS=null;try{ITEMS=JSON.parse(localStorage.getItem('apt3d_items_v1'))}catch(e){}
+if(!Array.isArray(ITEMS)||!ITEMS.length)ITEMS=DEFAULT.map(o=>({...o}));
+const PROXYG={};
+
+// proxies (no IKEA 3D model available) at real IKEA dims
+const proxy=(no,fn)=>{const g=new THREE.Group();fn(g);PROXYG[no]=g};
+// POÄNG rocking-chair walnut effect (68w x 94d x 95h cm approx) - proxy
+proxy("59627132",g=>{g.position.set(3.05,0,5.45);g.rotation.y=Math.PI*.8;const curve=new THREE.CatmullRomCurve3([[-.0,0,.45],[0,.02,0],[0,.08,-.45]].map(p=>new THREE.Vector3(...p)));
+ for(const s of[-.32,.32]){const t=new THREE.Mesh(new THREE.TubeGeometry(curve,20,.025,8),mat.walnut);t.position.x=s;g.add(t);box(.05,.5,.05,s,.3,.1,mat.walnut,g)}
+ const seat=box(.58,.08,.55,0,.42,.05,mat.cream,g);seat.rotation.x=.15;const back=box(.58,.65,.08,0,.78,-.28,mat.cream,g);back.rotation.x=-.35});
+// GULDVÄVARE mobile - proxy
+proxy("80573655",g=>{g.position.set(2.6,0,7.18);cyl(.006,.006,.6,2.6,2.2,7.18,mat.chrome,4);box(.6,.01,.01,0,1.9,0,mat.chrome,g);
+ sph(.06,2.3,1.72,7.18,mat.mus);box(.09,.09,.09,.3,1.72,0,mat.red,g);box(.01,.01,.5,0,1.88,0,mat.chrome,g);const tri=new THREE.Mesh(new THREE.ConeGeometry(.06,.11,3),mat.blue);tri.position.set(0,1.7,.25);g.add(tri);sph(.05,2.6,1.72,6.93,mat.sage)});
+// dual monitors (not IKEA, your own screens)
+for(const [dx,r] of[[-.3,.18],[.3,-.18]]){const s=box(.62,.38,.03,5.3+dx,1.15,.55,mat.screen);s.rotation.y=r;box(.04,.3,.04,5.3+dx,.88,.5,mat.chrome)}
+// decor (not for sale)
+art(.12,1.85,2.9,Math.PI/2,1.2,.7);art(5.1,1.7,3.43,Math.PI,1.0,.7);art(10.3,1.6,6.0,-Math.PI/2,1.1,.8,[mat.blue,mat.red,mat.mus]);plant(7.0,1.5);plant(6.3,3.2,.7);
+box(.04,2.48,2.75,1.82,1.25,6.15,mat.blush);textMesh('SEROJA',3.3,1.95,7.47,Math.PI,'#c8412f',1.8,.45);
+{const c1=new THREE.Mesh(new THREE.CircleGeometry(.25,32),mat.mus);c1.position.set(1.95,1.8,7.48);c1.rotation.y=Math.PI;S.add(c1);
+ const c3=new THREE.Mesh(new THREE.PlaneGeometry(.3,.3),mat.sage);c3.position.set(4.65,1.85,7.48);c3.rotation.y=Math.PI;S.add(c3);}
+box(.08,2.2,2.2,7.0,1.1,2.9,mat.walnut);// TV feature wall (walnut slat panel, decor)
+box(.05,.8,1.4,7.08,1.3,2.9,mat.black);// TV
+// ---------- KITCHEN (5.9..8.7, 7.6..10.05) ----------
+box(2.7,.88,.6,7.3,.44,9.72,mat.walnut);box(2.72,.04,.62,7.3,.9,9.72,mat.terr);box(2.7,.7,.35,7.3,1.85,9.85,mat.cream);
+for(let i=0;i<5;i++)box(.5,.6,.02,6.2+i*.55,1.85,9.67,i==2?mat.mus:mat.cream);box(.5,.02,.4,6.5,.93,9.7,mat.chrome);box(.6,.02,.45,7.9,.93,9.7,mat.black);
+box(.7,1.85,.65,6.4,.93,7.95,mat.white);box(.6,.88,.6,7.6,.44,7.95,mat.walnut);box(.62,.04,.62,7.6,.9,7.95,mat.terr);
+cyl(.15,.15,.25,7.6,1.05,7.95,mat.red);
+// yard
+box(.6,.85,.6,5.2,.43,8.0,mat.white);cyl(.2,.2,.02,5.2,.86,8.0,mat.glass);box(.05,1.6,1.5,4.75,1.4,9.0,mat.grey);
+// bathrooms
+const bath=(x1,x2,z1,z2)=>{const cx=(x1+x2)/2;box(.4,.4,.55,x1+.3,.2,z1+1.3,mat.white);box(.25,.35,.55,x1+.15,.55,z1+1.3,mat.white);
+ box(.5,.8,.4,x1+.3,.4,z1+.45,mat.teak);box(.45,.05,.35,x1+.3,.82,z1+.45,mat.white);sph(.16,x1+.08,1.5,z1+.45,mat.chrome).scale.set(.1,1.2,1);
+ box(x2-x1-.2,.03,.9,cx,.01,z2-.55,mat.blue);box(.02,2,.9,x2-.2,1,z2-.55,mat.glass);box(x2-x1-.2,1.2,.02,cx,.6,z2-.1,mat.mus)};
+bath(.1,1.7,4.8,7.5);bath(4.9,6.55,4.8,7.5);
+// foyer
+box(1.2,.9,.35,9.5,.45,9.85,mat.teak);sph(.2,9.2,1.4,9.95,mat.mus);cyl(.25,.25,1.6,8.95,.8,9.75,mat.chrome,6).scale.set(.1,1,.1);
+box(.06,2.1,.9,10.33,1.05,8.4,mat.red);// front door (brick red accent)
+// door leaves (teak) indicative
+for(const [x,z,r] of[[3.2,4.1,0],[6.6,3.2,0],[4.4,4.75,Math.PI/2],[5.3,4.75,Math.PI/2],[1.2,4.75,Math.PI/2],[5.25,7.6,Math.PI/2]]){const d=box(.04,2.05,.7,x,1.03,z,mat.teak);d.rotation.y=r;d.material=mat.teak;d.position.x+=r?0:.0}
+// ceiling lights for interior warmth
+for(const [x,z] of[[1.6,2.9],[5,2],[3.3,6.1],[8.6,3],[8.3,5.9],[7.3,8.8]]){const l=new THREE.PointLight(0xffd9a0,2.2,5,1.6);l.position.set(x,2.2,z);S.add(l)}
+// ---------- labels / camera ----------
+const rooms={Overview:[5.2,0,5,5.2,16,15],Master:[1.5,0,2.9,2.4,6.2,6.6],'Office + Wardrobe':[5.1,0,1.9,5.6,6.4,5.6],'Bilik Seroja':[3.3,0,6.4,3.4,5.8,3.3],
+ Living:[8.6,0,2.9,6.0,6.0,6.8],Dining:[8.3,0,6.0,5.6,6.2,8.6],Kitchen:[7.3,0,8.8,7.0,6,5.4]};
+let tgt=null;function fly(n){const r=rooms[n];tgt={p:new THREE.Vector3(r[3],r[4],r[5]),t:new THREE.Vector3(r[0],r[1]+.6,r[2]),k:0}}
+const ui=document.getElementById('ui');const cls={'Bilik Seroja':'k','Office + Wardrobe':'b',Living:'y'};
+for(const n in rooms){const b=document.createElement('button');b.textContent=n;b.className=cls[n]||'';b.onclick=()=>fly(n);ui.appendChild(b)}
+const tb=document.createElement('button');tb.textContent='Top-down';let top=false;tb.onclick=()=>{top=!top;tb.textContent=top?'Dollhouse':'Top-down';
+ tgt={p:top?new THREE.Vector3(5.18,19,5.03):new THREE.Vector3(5.2,16,15),t:new THREE.Vector3(5.18,0,5.0),k:0}};ui.appendChild(tb);
+const r0=rooms.Overview;C.position.set(r0[3],r0[4],r0[5]);O.target.set(r0[0],.6,r0[2]);
+const h=decodeURIComponent(location.hash.slice(1));if(rooms[h]){const r=rooms[h];C.position.set(r[3],r[4],r[5]);O.target.set(r[0],r[1]+.6,r[2])}if(h=='list'){}if(h=='top'){C.position.set(5.18,19,5.03);O.target.set(5.18,0,5)}
+O.update();addEventListener('resize',()=>{C.aspect=innerWidth/innerHeight;C.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+(function loop(){requestAnimationFrame(loop);if(tgt){tgt.k+=.04;const e=Math.min(tgt.k,1);C.position.lerp(tgt.p,e*.25);O.target.lerp(tgt.t,e*.25);if(tgt.k>=1.6)tgt=null}O.update();R.render(S,C)})();
+
+// ---------- shopping UI ----------
+// ================= EDITABLE FURNITURE (Swap / Add / drag) =================
+const CATN={sofa:'Sofas',armchair:'Armchairs',bed:'Beds',bedside:'Bedside tables',wardrobe:'Wardrobes',desk:'Desks',officechair:'Office chairs',diningtable:'Dining tables',diningchair:'Dining chairs',coffeetable:'Coffee & side tables',tvbench:'TV benches',sideboard:'Sideboards & storage',shelving:'Shelving',lamp:'Lamps',rug:'Rugs',nursery:'Cots & nursery'};
+const WALLCATS=new Set(['bed','bedside','wardrobe','sofa','tvbench','sideboard','shelving','desk','nursery']);
+const RN={Master:'Master bedroom',Office:'Bedroom 2 · Office + wardrobe',Seroja:'Bedroom 3 · Bilik Seroja',Living:'Living',Dining:'Dining',Kitchen:'Kitchen'};
+const RCOL={Master:'#1f4fa3',Office:'#d6332b',Seroja:'#e0a21b',Living:'#222222',Dining:'#2f7d4f',Kitchen:'#7a5c3e'};
+const RCEN={Master:[1.6,3],Office:[5,2],Seroja:[3.3,6.1],Living:[8.6,3.6],Dining:[8.3,6],Kitchen:[7.3,8.8]};
+const BTN2ROOM={Master:'Master','Office + Wardrobe':'Office','Bilik Seroja':'Seroja',Living:'Living',Dining:'Dining',Kitchen:'Kitchen',Overview:null};
+let curRoom='Living';document.querySelectorAll('#ui button').forEach(b=>{if(b.textContent in BTN2ROOM)b.addEventListener('click',()=>{if(BTN2ROOM[b.textContent])curRoom=BTN2ROOM[b.textContent]})});
+const save=()=>{try{localStorage.setItem('apt3d_items_v1',JSON.stringify(ITEMS.map(({g,...r})=>r)))}catch(e){}};
+function tagI(o,it){o.traverse(m=>{m.userData.it=it;m.userData.prod=it.no;if(m.isMesh){m.castShadow=m.receiveShadow=true;if(!pickables.includes(m))pickables.push(m)}})}
+function untag(o){o.traverse(m=>{const k=pickables.indexOf(m);if(k>=0)pickables.splice(k,1)})}
+const ASSET=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?'':'https://cdn.jsdelivr.net/gh/kaberikram/apt3d@main/';
+const asset=u=>!u||/^https?:/.test(u)||u.startsWith('models/')||!ASSET?u:ASSET+u;
+const glbCache={};const loadGLB=url=>glbCache[url]??=new Promise((res,rej)=>loader.load(asset(url),g=>res(g.scene),undefined,rej));
+async function build(it,prevDepth){
+ const p=getP(it.no);
+ if(!p.model){const g=PROXYG[it.no];if(g){if(it.x==null){const c=new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());it.x=c.x;it.z=c.z;it.ry=0;it.base=[g.position.x,g.position.z,c.x,c.z]}
+   if(it.base){g.position.x=it.base[0]+(it.x-it.base[2]);g.position.z=it.base[1]+(it.z-it.base[3])}S.add(g);it.g=g;tagI(g,it)}return}
+ const src=await loadGLB(p.model);const o=src.clone(true);const w=new THREE.Group();w.add(o);
+ let bb=new THREE.Box3().setFromObject(o);const sz=bb.getSize(new THREE.Vector3());if(Math.max(sz.x,sz.y,sz.z)>20){o.scale.setScalar(.001);bb=new THREE.Box3().setFromObject(o)}
+ const c=bb.getCenter(new THREE.Vector3());o.position.set(-c.x,-bb.min.y,-c.z);w.rotation.y=it.ry||0;
+ const hy=bb.max.y-bb.min.y,dz=bb.max.z-bb.min.z;
+ if(prevDepth!=null&&WALLCATS.has(p.cat)){const d=(dz-prevDepth)/2;it.x+=Math.sin(it.ry||0)*d;it.z+=Math.cos(it.ry||0)*d}
+ w.userData.depth=dz;w.position.set(it.x,it.y<0?Math.max(1.5,2.5-hy-0.45):(it.y||0),it.z);S.add(w);it.g=w;tagI(w,it)}
+async function buildAll(){await Promise.all(ITEMS.map(it=>build(it).catch(e=>console.warn('model fail',it.no))));window.__models=true;refresh()}
+// ---------- library ----------
+fetch('library/library.json').then(r=>r.ok?r.json():{}).then(j=>{for(const k in j)if(!LIB[k])LIB[k]=j[k];refresh()}).catch(()=>{});
+// ---------- shopping list / badges / totals ----------
+const info=document.getElementById('info'),list=document.getElementById('list');
+const fmt=n=>'RM'+n.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2});
+const artno=no=>no.replace(/(\d{3})(\d{3})(\d{2})/,'$1.$2.$3');
+let selIt=null;
+function show(no,it){const p=getP(no);if(!p)return;const m=p.meas||{};const d=p.dims||(m.width?`${m.width/10}x${(m.depth||m.length||0)/10}x${(m.height||m['max. height']||0)/10} cm`:'');
+ info.innerHTML=`${p.thumb?`<img src="${p.thumb}" style="float:right;width:64px;height:64px;object-fit:contain;background:#fff;border-radius:8px">`:''}<b style="font-size:17px">${p.name}</b> <span class="tag ${p.model?'':'px'}">${p.model?'IKEA 3D model':'proxy'}</span><br>${p.type} · ${p.desc||''}<br>${d?('Size: '+d+'<br>'):''}Art. no. ${artno(p.no)}<br><span class="p">${fmt(p.price)}</span><br><a href="${p.url}" target="_blank">Open on IKEA Malaysia →</a> <span style="float:right;cursor:pointer" onclick="this.parentNode.style.display='none'">✕</span>`+
+ (it?`<div class="ed"><button id="bSwap">⇄ Swap</button><button id="bL">⟲</button><button id="bR">⟳</button><button id="bDup">＋ Copy</button><button id="bDel">🗑</button></div><small>Edit mode: drag the piece to move it.</small>`:'');info.style.display='block';
+ if(it){bSwap.onclick=()=>openPicker('swap',it);bL.onclick=()=>rot(it,Math.PI/12);bR.onclick=()=>rot(it,-Math.PI/12);bDel.onclick=()=>removeIt(it);bDup.onclick=()=>addItem(it.no,it.room,it.x+.3,it.z+.3,it.ry)}}
+window.__show=show;
+const badgeG=new THREE.Group();badgeG.visible=false;S.add(badgeG);const texCache={};
+function badgeTex(n,c){return texCache[n+c]??=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d');g.fillStyle=c;g.beginPath();g.arc(64,64,58,0,7);g.fill();g.lineWidth=8;g.strokeStyle='#f4efe4';g.stroke();g.fillStyle='#fff';g.font='bold 64px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(n,64,68);return new THREE.CanvasTexture(cv)})()}
+const ORDER=Object.keys(RN);
+function lines(){const byRoom={};for(const it of ITEMS){(byRoom[it.room]??={})[it.no]=(byRoom[it.room][it.no]||0)+1}return byRoom}
+function refresh(){const byRoom=lines();let tot=0,n=0;const num={};
+ let hh='<b style="font-size:16px">IKEA shopping list</b> <span style="float:right;cursor:pointer" onclick="this.parentNode.style.display=\'none\'">✕</span><br><button id="bCsv">⬇ Export CSV</button> <button id="bReset">↺ Reset to original</button>';
+ for(const r of ORDER){if(!byRoom[r])continue;let sub=0;hh+=`<h4 style="color:${RCOL[r]}">${RN[r]}</h4>`;
+  for(const no in byRoom[r]){const p=getP(no),q=byRoom[r][no];num[r+'|'+no]=++n;sub+=p.price*q;hh+=`<div onclick="__show('${no}')"><b style="color:${RCOL[r]}">${n}</b> ${q}× <b>${p.name}</b> ${p.type} <span class="tag ${p.model?'':'px'}">${p.model?'3D':'proxy'}</span><span style="float:right">${fmt(p.price*q)}</span><br><a href="${p.url}" target="_blank" onclick="event.stopPropagation()">ikea.com/my</a></div>`}
+  tot+=sub;hh+=`<div style="text-align:right">Subtotal ${fmt(sub)}</div>`}
+ list.innerHTML=hh+`<p class="tot">Total ${fmt(tot)}</p><small>Prices from ikea.com/my, Nov 2026. Delivery/assembly not included.</small>`;
+ bCsv.onclick=exportCSV;bReset.onclick=()=>{if(confirm('Reset all furniture to the original design?')){localStorage.removeItem('apt3d_items_v1');location.reload()}};
+ totB.textContent='Total '+fmt(tot);
+ badgeG.clear();for(const it of ITEMS){if(!it.g)continue;const k=num[it.room+'|'+it.no];const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:badgeTex(k,RCOL[it.room]||'#222'),depthTest:false,toneMapped:false}));sp.renderOrder=999;sp.scale.set(.42,.42,1);
+  const c=new THREE.Box3().setFromObject(it.g).getCenter(new THREE.Vector3());sp.position.set(c.x,2.7,c.z);badgeG.add(sp)}
+ save()}
+function exportCSV(){const byRoom=lines();const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';let rows=[['Room','Product','Type','Article no.','Qty','Unit RM','Line RM','URL']],tot=0;
+ for(const r of ORDER){if(!byRoom[r])continue;let sub=0;for(const no in byRoom[r]){const p=getP(no),n=byRoom[r][no];sub+=p.price*n;rows.push([RN[r],p.name,p.type,artno(no),n,p.price.toFixed(2),(p.price*n).toFixed(2),p.url])}rows.push([RN[r],'SUBTOTAL','','','','',sub.toFixed(2),'']);tot+=sub}
+ rows.push(['ALL','TOTAL','','','','',tot.toFixed(2),'']);const csv='\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='ikea_shopping_list_custom.csv';a.click();window.__csv=csv}
+// ---------- edit ops ----------
+function rot(it,a){it.ry=(it.ry||0)+a;if(it.g)it.g.rotation.y+=a;refresh()}
+function removeIt(it){if(it.g){S.remove(it.g);untag(it.g)}ITEMS.splice(ITEMS.indexOf(it),1);info.style.display='none';selIt=null;refresh()}
+async function swap(it,no){const prev=it.g?.userData.depth;if(it.g){S.remove(it.g);untag(it.g)}it.no=no;delete it.proxy;delete it.base;
+ if(it.y>0&&!['shelving','lamp','nursery'].includes(getP(no).cat))it.y=0;try{await build(it,prev)}catch(e){alert('This 3D model is not included in this copy (lite zip). Use the full apt3d.zip to swap.')}refresh();show(no,it);window.__swapped=(window.__swapped||0)+1}
+async function addItem(no,room,x,z,ry=0){const c=RCEN[room]||[5,5];const it={no,room,x:x??c[0],z:z??c[1],ry,y:0};ITEMS.push(it);try{await build(it)}catch(e){ITEMS.pop();alert('This 3D model is not included in this copy (lite zip). Use the full apt3d.zip.');return}refresh();selIt=it;show(no,it);return it}
+// ---------- picker panel ----------
+const pk=document.createElement('div');pk.id='pick';document.body.appendChild(pk);
+const st=document.createElement('style');st.textContent=`#pick{position:fixed;left:10px;top:96px;bottom:40px;width:360px;background:#fffaf2;border-radius:14px;box-shadow:0 2px 10px #0004;z-index:4;display:none;flex-direction:column;font-size:13px}
+#pick .hd{padding:10px 12px;border-bottom:3px solid #222}#pick .hd b{font-size:16px}#pick input,#pick select{font:inherit;padding:5px 7px;border:1px solid #ccc;border-radius:8px;margin:3px 2px 0 0;box-sizing:border-box}
+#pick .ls{overflow:auto;flex:1;padding:6px}#pick .c{display:flex;gap:8px;align-items:center;padding:6px;border-radius:10px;cursor:pointer;border:2px solid transparent}#pick .c:hover{background:#f1e8da}#pick .c.cur{border-color:#c8412f}
+#pick img,#pick .ph{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:8px;flex:none}#pick .ph{display:flex;align-items:center;justify-content:center;color:#aaa;font-size:22px}
+#pick .pr{color:#c8412f;font-weight:800}#pick .x{float:right;cursor:pointer;font-size:18px}.ed button{margin:6px 4px 0 0;border:0;border-radius:12px;padding:6px 10px;background:#222;color:#fff;font-weight:700;cursor:pointer}
+#totB{background:#222!important;color:#fff!important}#ui button.on{outline:3px solid #c8412f}
+@media (max-width:600px){#pick{width:auto;right:10px;top:auto;height:55vh}}`;document.head.appendChild(st);
+let pMode=null,pIt=null;
+function openPicker(mode,it){pMode=mode;pIt=it;const cat=it?getP(it.no).cat:'sofa';
+ pk.innerHTML=`<div class="hd"><span class="x" id="pX">✕</span><b>${mode=='swap'?'Swap: '+getP(it.no).name+' '+getP(it.no).type:'Add item to '+RN[curRoom]}</b><br>
+ <select id="pCat">${Object.entries(CATN).map(([k,v])=>`<option value="${k}" ${k==cat?'selected':''}>${v}</option>`).join('')}</select>
+ ${mode=='add'?`<select id="pRoom">${Object.keys(RN).map(r=>`<option ${r==curRoom?'selected':''} value="${r}">${RN[r]}</option>`).join('')}</select>`:''}
+ <input id="pQ" placeholder="Search name / type / colour" style="width:100%"><input id="pMin" type="number" placeholder="Min RM" style="width:30%"><input id="pMax" type="number" placeholder="Max RM" style="width:30%">
+ <select id="pSort"><option value="s">Style first</option><option value="lo">Price ↑</option><option value="hi">Price ↓</option></select><div id="pN" style="color:#777;margin-top:3px"></div></div><div class="ls" id="pL"></div>`;
+ pk.style.display='flex';pX.onclick=()=>pk.style.display='none';for(const e of [pCat,pQ,pMin,pMax,pSort])e.oninput=renderPick;renderPick()}
+function renderPick(){const cat=pCat.value,q=pQ.value.toLowerCase(),mn=+pMin.value||0,mx=+pMax.value||1e9;
+ let L=Object.values(LIB).filter(p=>p.cat==cat&&p.model&&p.price>=mn&&p.price<=mx&&(!q||(p.name+' '+p.type+' '+(p.design||'')+' '+(p.desc||'')).toLowerCase().includes(q)));
+ if(pSort.value=='lo')L.sort((a,b)=>a.price-b.price);if(pSort.value=='hi')L.sort((a,b)=>b.price-a.price);
+ pN.textContent=L.length+' with IKEA 3D models';const cur=pIt?.no;
+ pL.innerHTML=L.map(p=>`<div class="c ${p.no==cur?'cur':''}" data-no="${p.no}">${p.thumb?`<img loading="lazy" src="${p.thumb}">`:'<div class="ph">▦</div>'}<div><b>${p.name}</b><br>${p.type}${p.design?' · '+p.design:''}<br><span class="pr">${fmt(p.price)}</span> <a href="${p.url}" target="_blank" onclick="event.stopPropagation()">IKEA ↗</a></div></div>`).join('');
+ pL.querySelectorAll('.c').forEach(d=>d.onclick=async()=>{const no=d.dataset.no;if(pMode=='swap')await swap(pIt,no);else{const r=document.getElementById('pRoom')?.value||curRoom;curRoom=r;pIt=await addItem(no,r)}renderPick()})}
+window.__openPicker=openPicker;window.__LIBALL=()=>LIB;window.__ITEMS=ITEMS;window.__swap=swap;window.__addItem=addItem;
+// ---------- toolbar ----------
+const lb=document.createElement('button');lb.textContent='🛒 Shopping list';lb.className='k';lb.onclick=()=>{list.style.display=list.style.display=='block'?'none':'block'};ui.appendChild(lb);
+let edit=false;const eb=document.createElement('button');eb.textContent='✎ Swap / edit';eb.onclick=()=>{edit=!edit;eb.classList.toggle('on',edit);document.getElementById('t').textContent=edit?'EDIT MODE · tap a piece to swap, rotate or delete · drag to move':'Drag to orbit · pinch/scroll to zoom · tap furniture for IKEA product'};ui.appendChild(eb);
+const ab=document.createElement('button');ab.textContent='＋ Add item';ab.onclick=()=>{if(!edit)eb.click();openPicker('add',null)};ui.appendChild(ab);
+const bb=document.createElement('button');bb.textContent='① Badges';bb.onclick=()=>{badgeG.visible=!badgeG.visible};ui.appendChild(bb);
+const totB=document.createElement('button');totB.id='totB';totB.onclick=lb.onclick;ui.appendChild(totB);
+// ---------- picking + dragging ----------
+const rc=new THREE.Raycaster(),mv=new THREE.Vector2(),floorPl=new THREE.Plane(new THREE.Vector3(0,1,0),0);let down,drag=null;
+const ray=e=>{mv.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);rc.setFromCamera(mv,C)};
+R.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];if(!edit)return;ray(e);const h=rc.intersectObjects(pickables,false)[0];
+ if(h&&h.object.userData.it&&h.object.userData.it===selIt){const p=new THREE.Vector3();rc.ray.intersectPlane(floorPl,p);drag={it:selIt,ox:selIt.x-p.x,oz:selIt.z-p.z};O.enabled=false}});
+R.domElement.addEventListener('pointermove',e=>{if(!drag)return;ray(e);const p=new THREE.Vector3();if(!rc.ray.intersectPlane(floorPl,p))return;const it=drag.it;const nx=p.x+drag.ox,nz=p.z+drag.oz;
+ it.g.position.x+=nx-it.x;it.g.position.z+=nz-it.z;it.x=nx;it.z=nz;drag.moved=true});
+R.domElement.addEventListener('pointerup',e=>{O.enabled=true;if(drag){const m=drag.moved;drag=null;if(m){refresh();return}}
+ if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;ray(e);
+ const hit=rc.intersectObjects(pickables,false)[0];if(hit){const it=hit.object.userData.it;if(edit&&it){selIt=it;curRoom=it.room;show(it.no,it);if(pk.style.display=='flex'&&pMode=='swap')openPicker('swap',it)}else show(hit.object.userData.prod)}else{info.style.display='none';selIt=null}});
+buildAll();refresh();
+
+if(location.hash=='#list')list.style.display='block';
+window.__ready=true;
+</script></body></html>
